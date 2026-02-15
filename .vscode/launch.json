@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lua-local",
+            "request": "launch",
+            "name": "Debug LÖVE (WSL2 → Windows)",
+            "program": {
+                "command": "/mnt/c/Program Files/LOVE/love.exe"
+            },
+            "args": [
+                "${workspaceFolder}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "verbose": false
+        }
+    ]
+}

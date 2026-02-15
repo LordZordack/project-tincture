@@ -1,0 +1,13 @@
+# LÖVE build outputs
+*.love
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor directories
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
