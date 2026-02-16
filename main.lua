@@ -6,36 +6,15 @@ end
 local Player = require("entities.player")
 local Camera = require("entities.camera")
 local Room   = require("systems.room")
+local Input  = require("systems.input")
 
 -- Game state
 local game = {
     player = nil,
     camera = nil,
     room   = nil,
+    input  = nil,
 }
-
--- Simple input reading (will be replaced by systems/input.lua in ticket 03)
-local function read_input()
-    local input = {}
-
-    -- Movement (WASD) — orientation-relative axes
-    input.forward = 0
-    input.strafe = 0
-    if love.keyboard.isDown("w") then input.forward = input.forward + 1 end
-    if love.keyboard.isDown("s") then input.forward = input.forward - 1 end
-    if love.keyboard.isDown("a") then input.strafe = input.strafe + 1 end
-    if love.keyboard.isDown("d") then input.strafe = input.strafe - 1 end
-
-    -- Aim (mouse in world space via camera conversion)
-    local mx, my = love.mouse.getPosition()
-    input.aim_x, input.aim_y = game.camera:screen_to_world(mx, my)
-
-    -- Dash (Space) — pressed-this-frame flag
-    input.dash = game._dash_pressed or false
-    game._dash_pressed = false
-
-    return input
-end
 
 -- LÖVE callbacks
 function love.load()
@@ -53,14 +32,17 @@ function love.load()
     -- Camera starts at player position
     game.camera = Camera.new(cx, cy)
 
+    -- Input system (needs camera for screen-to-world conversion)
+    game.input = Input.new(game.camera)
+
     print("Game loaded successfully!")
 end
 
 function love.update(dt)
-    local input = read_input()
+    local intent = game.input:read()
 
     -- Update player
-    game.player:update(dt, input)
+    game.player:update(dt, intent)
 
     -- Clamp player to room walls
     game.player.x, game.player.y = game.room:clamp(
@@ -87,7 +69,13 @@ end
 function love.keypressed(key, scancode, isrepeat)
     if key == "escape" then
         love.event.quit()
-    elseif key == "space" then
-        game._dash_pressed = true
     end
+
+    -- Forward to input system for pressed-this-frame tracking
+    game.input:on_keypressed(key)
+end
+
+function love.mousepressed(x, y, button)
+    -- Forward to input system for pressed-this-frame tracking
+    game.input:on_mousepressed(button)
 end

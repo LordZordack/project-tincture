@@ -8,23 +8,23 @@ Implement a multi-room dungeon with doors connecting rooms. Some doors are locke
 ## Requirements
 
 ### Dungeon Manager
-- Room graph: rooms connected by doors
-- Transition: player walks to a door and interacts to move to the next room
-- Room state persists when leaving and re-entering (items, corpses, dead NPCs stay)
+- [ ] Room graph: rooms connected by doors
+- [ ] Transition: player walks to a door and interacts to move to the next room
+- [ ] Room state persists when leaving and re-entering (items, corpses, dead NPCs stay)
 
 ### Doors
-- Visual distinction between open, closed, and locked doors
-- Locked doors require a key item — key is consumed on use
-- Door placement on room edges
+- [ ] Visual distinction between open, closed, and locked doors
+- [ ] Locked doors require a key item — key is consumed on use
+- [ ] Door placement on room edges
 
 ### Room Types
-- Combat rooms: hostile NPCs spawned on first load
-- Loot rooms: chests and scattered items
-- Locked rooms: better loot, require keys
-- The King's Chamber: final room (see ticket 16)
+- [ ] Combat rooms: hostile NPCs spawned on first load
+- [ ] Loot rooms: chests and scattered items
+- [ ] Locked rooms: better loot, require keys
+- [ ] The King's Chamber: final room (see ticket 16)
 
 ### Room Data Format
-- Each room defined by: dimensions, walls, doors (with connections), NPC spawn list, item spawn list
+- [ ] Each room defined by: dimensions, walls, doors (with connections), NPC spawn list, item spawn list
 
 ## Files
 - `systems/dungeon.lua` [NEW]
@@ -32,8 +32,8 @@ Implement a multi-room dungeon with doors connecting rooms. Some doors are locke
 - `main.lua` [MODIFY] — dungeon manager integration
 
 ## Acceptance Criteria
-- Multiple rooms exist with doors connecting them
-- Walk to a door and interact — transitions to the connected room
-- Locked doors won't open without a key; key is consumed when used
-- Items and corpses persist in rooms when revisiting
-- Different room types are visually distinguishable
+- [ ] Multiple rooms exist with doors connecting them
+- [ ] Walk to a door and interact — transitions to the connected room
+- [ ] Locked doors won't open without a key; key is consumed when used
+- [ ] Items and corpses persist in rooms when revisiting
+- [ ] Different room types are visually distinguishable
