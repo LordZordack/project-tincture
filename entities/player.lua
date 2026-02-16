@@ -50,10 +50,23 @@ function Player.new(x, y)
     -- Carry system
     self.carry_strength = 10 -- max weight per item that can be picked up
     self.carried = {} -- array of up to 3 carried items (index 1 = active)
-    self.orbit_angle = 0 -- current angle for orbiting items animation
-    self.orbit_speed = 2.0 -- radians/sec for orbit rotation
-    self.orbit_radius = 35 -- distance from player center for orbiting items
     self.active_item_distance = 25 -- distance forward for active item
+
+    -- Tether system for floating brothers (items 2 & 3)
+    self.tether_pos = {
+        [2] = { x = x, y = y },
+        [3] = { x = x, y = y },
+    }
+    self.tether_dist = 40 -- distance behind player
+    self.tether_spread = 20 -- distance sideways from center line
+
+    -- Combat
+    self.is_attacking = false
+    self.attack_timer = 0
+    self.attack_duration = 0.3
+    self.attack_cooldown = 0
+    self.attack_cooldown_timer = 0
+    self.attack_arc_angle = math.pi / 2 -- 90 degree swing
 
     return self
 end
@@ -96,8 +109,11 @@ function Player:update(dt, input)
     -- 3. Movement
     self:_update_movement(dt, input)
 
-    -- 4. Update orbit animation
-    self.orbit_angle = self.orbit_angle + self.orbit_speed * dt
+    -- 4. Update tether animation
+    self:_update_tether(dt)
+
+    -- 5. Attack timers
+    self:_update_attack(dt)
 end
 
 function Player:_update_orientation(dt, input)
@@ -285,6 +301,63 @@ function Player:get_active_item()
     return self.carried[1]
 end
 
+--- Initiate an attack.
+-- @param duration number How long the swing lasts
+-- @param cooldown number Cooldown until next attack
+function Player:attack(duration, cooldown)
+    if self.is_attacking or self.attack_cooldown_timer > 0 then return false end
+
+    self.is_attacking = true
+    self.attack_timer = duration
+    self.attack_duration = duration
+    self.attack_cooldown_timer = cooldown
+    return true
+end
+
+function Player:_update_attack(dt)
+    if self.attack_cooldown_timer > 0 then
+        self.attack_cooldown_timer = self.attack_cooldown_timer - dt
+    end
+
+    if self.is_attacking then
+        self.attack_timer = self.attack_timer - dt
+        if self.attack_timer <= 0 then
+            self.is_attacking = false
+        end
+    end
+end
+
+function Player:_update_tether(dt)
+    -- Calculate target positions for brothers (behind player)
+    local back_angle = self.angle + math.pi
+    local cos_b = math.cos(back_angle)
+    local sin_b = math.sin(back_angle)
+
+    -- Perpendicular vector for spread
+    local perp_x = -sin_b
+    local perp_y = cos_b
+
+    local lerp_speed = 5.0 * dt -- smoothness of tether
+
+    for i = 2, 3 do
+        if self.carried[i] then
+            -- Target position relative to player
+            local spread_dir = (i == 2) and -1 or 1 -- Left/Right
+            local tx = self.x + cos_b * self.tether_dist + perp_x * self.tether_spread * spread_dir
+            local ty = self.y + sin_b * self.tether_dist + perp_y * self.tether_spread * spread_dir
+
+            -- Initialize if nil
+            if not self.tether_pos[i] then
+                self.tether_pos[i] = { x = self.x, y = self.y }
+            end
+
+            -- Lerp towards target
+            self.tether_pos[i].x = self.tether_pos[i].x + (tx - self.tether_pos[i].x) * lerp_speed
+            self.tether_pos[i].y = self.tether_pos[i].y + (ty - self.tether_pos[i].y) * lerp_speed
+        end
+    end
+end
+
 --- Draw the player as a triangle pointing in the facing direction.
 function Player:draw()
     -- Draw orbiting items first (behind player)
@@ -331,17 +404,28 @@ function Player:_draw_carried_items()
     for i, item in ipairs(self.carried) do
         if i == 1 then
             -- Active item: floats in front of the player
-            local ix = self.x + math.cos(self.angle) * self.active_item_distance
-            local iy = self.y + math.sin(self.angle) * self.active_item_distance
+            local angle = self.angle
+            local dist = self.active_item_distance
+
+            if self.is_attacking then
+                local progress = 1 - (self.attack_timer / self.attack_duration) -- 0 to 1
+                -- Swing arc: -45 to +45 degrees relative to facing
+                local swing = (progress - 0.5) * self.attack_arc_angle
+                angle = self.angle + swing
+                dist = dist + 10 * math.sin(progress * math.pi) -- lunge out slightly
+            end
+
+            local ix = self.x + math.cos(angle) * dist
+            local iy = self.y + math.sin(angle) * dist
+            item:draw_at(ix, iy)
             item:draw_at(ix, iy)
         else
-            -- Orbiting items: positioned at fixed angles offset from orbit_angle
-            local orbit_offset = (i == 2) and 0 or math.pi -- opposite sides
-            local a = self.orbit_angle + orbit_offset
-            local ix = self.x + math.cos(a) * self.orbit_radius
-            local iy = self.y + math.sin(a) * self.orbit_radius
+            -- Tethered items (floating behind)
+            local pos = self.tether_pos[i] or { x = self.x, y = self.y }
+            local ix = pos.x
+            local iy = pos.y
 
-            -- Brother glow (faint aura around orbiting items)
+            -- Brother glow (faint aura around floating items)
             local glow_color = (i == 2)
                 and { 0.6, 0.8, 1.0, 0.15 } -- Enas: cool blue glow
                 or { 1.0, 0.8, 0.6, 0.15 } -- Dyo: warm amber glow

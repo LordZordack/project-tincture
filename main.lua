@@ -9,6 +9,7 @@ local Room        = require("systems.room")
 local Input       = require("systems.input")
 local Item        = require("entities.item")
 local ItemManager = require("systems.item_manager")
+local Combat      = require("systems.combat")
 
 -- Game state
 local game = {
@@ -17,6 +18,7 @@ local game = {
     room         = nil,
     input        = nil,
     item_manager = nil,
+    combat       = nil,
 }
 
 -- LÖVE callbacks
@@ -52,6 +54,9 @@ function love.load()
     }
     game.item_manager = ItemManager.new(test_items)
 
+    -- Combat system
+    game.combat = Combat.new()
+
     print("Game loaded successfully!")
 end
 
@@ -62,6 +67,9 @@ function love.update(dt)
     game.item_manager:handle_interact(game.player, intent)
     game.item_manager:handle_swap(game.player, intent)
     game.item_manager:handle_throw(game.player, intent)
+
+    -- Combat (melee attack)
+    game.combat:handle_input(game.player, intent, game.item_manager, game.item_manager.items)
 
     -- Update player
     game.player:update(dt, intent)
@@ -91,6 +99,7 @@ function love.draw()
     love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
     love.graphics.print("WASD: Move | Mouse: Aim | Space: Dash", 10, 30)
     love.graphics.print("E: Pick up / Drop | Tab: Swap | Q: Throw", 10, 50)
+    love.graphics.print("LMB: Attack", 10, 110)
 
     -- Carry info
     local count = game.player:carry_count()
