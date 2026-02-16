@@ -16,6 +16,8 @@ function Player.new(x, y)
     -- Position
     self.x = x
     self.y = y
+    self.vx = 0
+    self.vy = 0
 
     -- Orientation (radians, 0 = right, increases counter-clockwise)
     self.angle = 0 -- current visual angle
@@ -161,15 +163,21 @@ end
 function Player:_update_movement(dt, input)
     if self.is_dashing then
         -- During dash: move in dash direction at dash speed
-        self.x = self.x + self.dash_dir_x * self.dash_speed * dt
-        self.y = self.y + self.dash_dir_y * self.dash_speed * dt
+        self.vx = self.dash_dir_x * self.dash_speed
+        self.vy = self.dash_dir_y * self.dash_speed
+        self.x = self.x + self.vx * dt
+        self.y = self.y + self.vy * dt
         return
     end
 
     -- Orientation-relative movement
     local fwd = (input.forward or 0) -- +1 = forward (W), -1 = backward (S)
     local strafe = (input.strafe or 0) -- +1 = right (D), -1 = left (A)
-    if fwd == 0 and strafe == 0 then return end
+    if fwd == 0 and strafe == 0 then
+        self.vx = 0
+        self.vy = 0
+        return
+    end
 
     -- Determine speed multiplier based on dominant input direction
     local speed_mult
@@ -196,8 +204,17 @@ function Player:_update_movement(dt, input)
 
     local speed = self.base_speed * speed_mult * self:_weight_speed_factor()
 
-    self.x = self.x + dx * speed * dt
-    self.y = self.y + dy * speed * dt
+    self.vx = dx * speed
+    self.vy = dy * speed
+
+    self.x = self.x + self.vx * dt
+    self.y = self.y + self.vy * dt
+end
+
+--- Get current player velocity.
+-- @return number vx, number vy
+function Player:get_velocity()
+    return self.vx, self.vy
 end
 
 --- Get total weight of all carried items.

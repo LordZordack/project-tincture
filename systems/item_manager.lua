@@ -1,5 +1,5 @@
 -- systems/item_manager.lua
--- Manages all items in the current room: pickup, drop, swap, and carry rendering.
+-- Manages all items in the current room: pickup, drop, swap, throw, and carry rendering.
 
 local Item = require("entities.item")
 
@@ -122,11 +122,18 @@ function ItemManager:handle_swap(player, intent)
     end
 end
 
---- Update all items.
+--- Update all items. Removes broken items.
 -- @param dt number Delta time
 function ItemManager:update(dt)
-    for _, item in ipairs(self.items) do
-        item:update(dt)
+    local i = 1
+    while i <= #self.items do
+        local result = self.items[i]:update(dt)
+        if result == "broke" then
+            table.remove(self.items, i)
+            -- don't increment i, next item slides into this position
+        else
+            i = i + 1
+        end
     end
 end
 
@@ -134,6 +141,38 @@ end
 function ItemManager:draw()
     for _, item in ipairs(self.items) do
         item:draw()
+    end
+end
+
+--- Try to throw the player's active item.
+-- @param player Player The player entity
+-- @return boolean True if an item was thrown
+function ItemManager:try_throw(player)
+    local item = player:get_active_item()
+    if not item then return false end
+
+    -- Check if item can be thrown (weight-based)
+    if not item.throwable then return false end
+
+    -- Remove from player's carried items
+    player:drop_active() -- removes from carried array
+
+    -- Set starting position to in front of the player
+    item.x = player.x + math.cos(player.angle) * player.active_item_distance
+    item.y = player.y + math.sin(player.angle) * player.active_item_distance
+
+    -- Launch as projectile in player's facing direction (inheriting velocity)
+    local vx, vy = player:get_velocity()
+    item:throw(player.angle, vx, vy)
+    return true
+end
+
+--- Handle throw input.
+-- @param player Player The player entity
+-- @param intent table Input intent
+function ItemManager:handle_throw(player, intent)
+    if intent.throw then
+        self:try_throw(player)
     end
 end
 

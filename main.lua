@@ -47,6 +47,8 @@ function love.load()
         Item.new({ name = "Crown", weight = 2, damage = 1, rarity = "EPIC", x = cx - 150, y = cy + 120,
             equip_slot = "head", protection = 3 }),
         Item.new({ name = "Ancient Blade", weight = 5, damage = 20, rarity = "LEGENDARY", x = cx, y = cy + 200 }),
+        Item.new({ name = "Glass Vial", weight = 1, damage = 2, rarity = "COMMON", x = cx + 50, y = cy - 120,
+            durability = 10, color = { 0.8, 0.9, 1.0 } }),
     }
     game.item_manager = ItemManager.new(test_items)
 
@@ -56,9 +58,10 @@ end
 function love.update(dt)
     local intent = game.input:read()
 
-    -- Item interactions (pickup, drop, swap)
+    -- Item interactions (pickup, drop, swap, throw)
     game.item_manager:handle_interact(game.player, intent)
     game.item_manager:handle_swap(game.player, intent)
+    game.item_manager:handle_throw(game.player, intent)
 
     -- Update player
     game.player:update(dt, intent)
@@ -87,7 +90,7 @@ function love.draw()
     love.graphics.setColor(1, 1, 1, 0.5)
     love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
     love.graphics.print("WASD: Move | Mouse: Aim | Space: Dash", 10, 30)
-    love.graphics.print("E: Pick up / Drop | Tab: Swap item", 10, 50)
+    love.graphics.print("E: Pick up / Drop | Tab: Swap | Q: Throw", 10, 50)
 
     -- Carry info
     local count = game.player:carry_count()

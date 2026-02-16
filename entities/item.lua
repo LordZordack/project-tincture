@@ -68,7 +68,8 @@ function Item.new(def)
     self.vel_x = 0
     self.vel_y = 0
     self.thrown_distance = 0
-    self.max_throw_distance = 300
+    self.throw_base_speed = 500 -- base throw speed (lighter = closer to this)
+    self.throw_impact_durability = 15 -- durability lost on impact
 
     -- Appearance
     self.color = def.color or self:_rarity_color()
@@ -134,8 +135,23 @@ function Item:damage_durability(amount)
     return false
 end
 
+--- Launch the item as a thrown projectile.
+-- @param angle number Direction to throw (radians)
+-- @param ivx number Inherited velocity x (default 0)
+-- @param ivy number Inherited velocity y (default 0)
+function Item:throw(angle, ivx, ivy)
+    self:set_state(Item.STATES.THROWN)
+    -- Heavier items fly slower and shorter
+    local speed = self.throw_base_speed / (1 + self.weight * 0.3)
+    self.vel_x = math.cos(angle) * speed + (ivx or 0)
+    self.vel_y = math.sin(angle) * speed + (ivy or 0)
+    self.thrown_distance = 0
+    self.max_throw_distance = 200 + (10 - math.min(self.weight, 9)) * 30 -- lighter = farther
+end
+
 --- Update item (for thrown projectiles).
 -- @param dt number Delta time
+-- @return string|nil  "landed" if it just landed, "broke" if it broke on impact
 function Item:update(dt)
     if self.state == Item.STATES.THROWN then
         self.x = self.x + self.vel_x * dt
@@ -143,12 +159,20 @@ function Item:update(dt)
         local speed = math.sqrt(self.vel_x * self.vel_x + self.vel_y * self.vel_y)
         self.thrown_distance = self.thrown_distance + speed * dt
         if self.thrown_distance >= self.max_throw_distance then
-            self:set_state(Item.STATES.GROUND)
             self.vel_x = 0
             self.vel_y = 0
             self.thrown_distance = 0
+            -- Impact: check durability
+            local broke = self:damage_durability(self.throw_impact_durability)
+            if broke then
+                return "broke"
+            else
+                self:set_state(Item.STATES.GROUND)
+                return "landed"
+            end
         end
     end
+    return nil
 end
 
 --- Draw the item (when on the ground or thrown).
