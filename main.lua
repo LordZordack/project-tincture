@@ -99,7 +99,7 @@ function love.draw()
     love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
     love.graphics.print("WASD: Move | Mouse: Aim | Space: Dash", 10, 30)
     love.graphics.print("E: Pick up / Drop | Tab: Swap | Q: Throw", 10, 50)
-    love.graphics.print("LMB: Attack", 10, 110)
+    love.graphics.print("LMB: Attack | RMB: Block", 10, 110)
 
     -- Carry info
     local count = game.player:carry_count()

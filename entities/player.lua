@@ -68,6 +68,9 @@ function Player.new(x, y)
     self.attack_cooldown_timer = 0
     self.attack_arc_angle = math.pi / 2 -- 90 degree swing
 
+    self.is_blocking = false
+    self.block_speed_factor = 0.6
+
     return self
 end
 
@@ -220,6 +223,10 @@ function Player:_update_movement(dt, input)
 
     local speed = self.base_speed * speed_mult * self:_weight_speed_factor()
 
+    if self.is_blocking then
+        speed = speed * self.block_speed_factor
+    end
+
     self.vx = dx * speed
     self.vy = dy * speed
 
@@ -327,6 +334,13 @@ function Player:_update_attack(dt)
     end
 end
 
+--- Set blocking state.
+-- @param blocking boolean True to block
+function Player:set_blocking(blocking)
+    if self.is_attacking and blocking then return end -- Can't block while swinging
+    self.is_blocking = blocking
+end
+
 function Player:_update_tether(dt)
     -- Calculate target positions for brothers (behind player)
     local back_angle = self.angle + math.pi
@@ -339,12 +353,35 @@ function Player:_update_tether(dt)
 
     local lerp_speed = 5.0 * dt -- smoothness of tether
 
+    if self.is_blocking then
+        -- Flanking defense: move specifically to sides
+        -- Left side (foritem 2, spread_dir -1), Right side (for item 3, spread_dir 1)
+        -- Closer and tighter formation
+        back_angle = self.angle -- align with facing
+        cos_b = math.cos(back_angle)
+        sin_b = math.sin(back_angle)
+        perp_x = -math.sin(back_angle)
+        perp_y = math.cos(back_angle)
+        lerp_speed = 10.0 * dt -- faster snap to block position
+    end
+
     for i = 2, 3 do
         if self.carried[i] then
             -- Target position relative to player
             local spread_dir = (i == 2) and -1 or 1 -- Left/Right
-            local tx = self.x + cos_b * self.tether_dist + perp_x * self.tether_spread * spread_dir
-            local ty = self.y + sin_b * self.tether_dist + perp_y * self.tether_spread * spread_dir
+
+            local tx, ty
+            if self.is_blocking then
+                -- Flank position: slightly forward/side
+                local flank_dist = 25
+                local side_dist = 30
+                tx = self.x + cos_b * flank_dist + perp_x * side_dist * spread_dir
+                ty = self.y + sin_b * flank_dist + perp_y * side_dist * spread_dir
+            else
+                -- Trail behind
+                tx = self.x + cos_b * self.tether_dist + perp_x * self.tether_spread * spread_dir
+                ty = self.y + sin_b * self.tether_dist + perp_y * self.tether_spread * spread_dir
+            end
 
             -- Initialize if nil
             if not self.tether_pos[i] then
@@ -413,10 +450,23 @@ function Player:_draw_carried_items()
                 local swing = (progress - 0.5) * self.attack_arc_angle
                 angle = self.angle + swing
                 dist = dist + 10 * math.sin(progress * math.pi) -- lunge out slightly
+            elseif self.is_blocking then
+                -- Held vertically/cross-body block?
+                -- Just hold closer and maybe rotate slightly
+                dist = dist * 0.7
+                angle = angle + math.pi / 8 -- slight angle
             end
 
             local ix = self.x + math.cos(angle) * dist
             local iy = self.y + math.sin(angle) * dist
+
+            if self.is_blocking then
+                -- Rotate item sprite for block?
+                -- draw_at uses 45deg default.
+                -- We can't rotate the sprite inside render easily without changing draw_at signature or pushing transform.
+                -- For now just position is changed.
+            end
+
             item:draw_at(ix, iy)
             item:draw_at(ix, iy)
         else

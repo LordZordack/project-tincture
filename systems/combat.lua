@@ -17,9 +17,20 @@ end
 -- @param item_manager ItemManager The item manager (to get active item)
 -- @param targets table List of damageable entities (optional, for now using item_manager.items)
 function Combat:handle_input(player, intent, item_manager, targets)
+    -- Attack
     if intent.attack then
         self:try_attack(player, item_manager, targets)
     end
+
+    -- Block
+    if intent.block ~= nil then
+        self:try_block(player, intent.block)
+    end
+end
+
+--- Attempt to block (or stop blocking).
+function Combat:try_block(player, is_blocking)
+    player:set_blocking(is_blocking)
 end
 
 --- Attempt to perform an attack.
@@ -99,6 +110,40 @@ function Combat:_angle_diff(a, b)
     local diff = (b - a) % (2 * math.pi)
     if diff > math.pi then diff = diff - 2 * math.pi end
     return diff
+end
+
+--- Resolve damage to a target (placeholder for future).
+-- @param target Entity The target taking damage
+-- @param amount number Raw damage amount
+-- @param source_x number Source of damage x
+-- @param source_y number Source of damage y
+function Combat:resolve_damage(target, amount, source_x, source_y)
+    local final_damage = amount
+
+    -- Check if target is blocking
+    if target.is_blocking and target.get_active_item then
+        -- Check angle? For now omni-directional block for simplicity
+        local item = target:get_active_item()
+        local protection = item and (item.protection or 0) + (item.weight or 0) or 1
+
+        -- Percentage reduction based on protection? Or flat?
+        -- Protection 1-10. Damage ~10.
+        -- Flat reduction seems safer for small numbers.
+        final_damage = math.max(0, amount - protection)
+
+        -- Durability loss on item
+        if item and item.damage_durability then
+            item:damage_durability(1) -- 1 durability per hit blocked
+        end
+
+        print("Blocked! Damage reduced from " .. amount .. " to " .. final_damage)
+    end
+
+    if target.take_damage then
+        target:take_damage(final_damage)
+    elseif target.damage_durability then
+        target:damage_durability(final_damage)
+    end
 end
 
 return Combat
