@@ -7,6 +7,7 @@ local Player = require("entities.player")
 local Camera = require("entities.camera")
 local Room   = require("systems.room")
 local Input  = require("systems.input")
+local Item   = require("entities.item")
 
 -- Game state
 local game = {
@@ -14,6 +15,7 @@ local game = {
     camera = nil,
     room   = nil,
     input  = nil,
+    items  = {},
 }
 
 -- LÖVE callbacks
@@ -35,6 +37,18 @@ function love.load()
     -- Input system (needs camera for screen-to-world conversion)
     game.input = Input.new(game.camera)
 
+    -- Spawn test items around the room
+    local cx, cy = game.room:center()
+    game.items = {
+        Item.new({ name = "Iron Sword", weight = 3, damage = 8, rarity = "UNCOMMON", x = cx - 100, y = cy - 80 }),
+        Item.new({ name = "Health Potion", weight = 1, damage = 0, rarity = "COMMON", x = cx + 120, y = cy - 50,
+            consumable = { type = "healing", amount = 30 } }),
+        Item.new({ name = "Battle Axe", weight = 7, damage = 15, rarity = "RARE", x = cx + 200, y = cy + 100 }),
+        Item.new({ name = "Crown", weight = 2, damage = 1, rarity = "EPIC", x = cx - 150, y = cy + 120,
+            equip_slot = "head", protection = 3 }),
+        Item.new({ name = "Ancient Blade", weight = 5, damage = 20, rarity = "LEGENDARY", x = cx, y = cy + 200 }),
+    }
+
     print("Game loaded successfully!")
 end
 
@@ -49,6 +63,11 @@ function love.update(dt)
         game.player.x, game.player.y, game.player.size
     )
 
+    -- Update items (thrown projectiles)
+    for _, item in ipairs(game.items) do
+        item:update(dt)
+    end
+
     -- Camera follows player
     game.camera:update(dt, game.player.x, game.player.y)
 end
@@ -57,6 +76,10 @@ function love.draw()
     -- World space (camera-transformed)
     game.camera:apply()
     game.room:draw()
+    -- Draw items
+    for _, item in ipairs(game.items) do
+        item:draw()
+    end
     game.player:draw()
     game.camera:release()
 
