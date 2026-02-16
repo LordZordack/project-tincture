@@ -3,19 +3,20 @@ if os.getenv("LOCAL_LUA_DEBUGGER_VSCODE") == "1" then
     require("lldebugger").start()
 end
 
-local Player = require("entities.player")
-local Camera = require("entities.camera")
-local Room   = require("systems.room")
-local Input  = require("systems.input")
-local Item   = require("entities.item")
+local Player      = require("entities.player")
+local Camera      = require("entities.camera")
+local Room        = require("systems.room")
+local Input       = require("systems.input")
+local Item        = require("entities.item")
+local ItemManager = require("systems.item_manager")
 
 -- Game state
 local game = {
-    player = nil,
-    camera = nil,
-    room   = nil,
-    input  = nil,
-    items  = {},
+    player       = nil,
+    camera       = nil,
+    room         = nil,
+    input        = nil,
+    item_manager = nil,
 }
 
 -- LÖVE callbacks
@@ -38,8 +39,7 @@ function love.load()
     game.input = Input.new(game.camera)
 
     -- Spawn test items around the room
-    local cx, cy = game.room:center()
-    game.items = {
+    local test_items = {
         Item.new({ name = "Iron Sword", weight = 3, damage = 8, rarity = "UNCOMMON", x = cx - 100, y = cy - 80 }),
         Item.new({ name = "Health Potion", weight = 1, damage = 0, rarity = "COMMON", x = cx + 120, y = cy - 50,
             consumable = { type = "healing", amount = 30 } }),
@@ -48,12 +48,17 @@ function love.load()
             equip_slot = "head", protection = 3 }),
         Item.new({ name = "Ancient Blade", weight = 5, damage = 20, rarity = "LEGENDARY", x = cx, y = cy + 200 }),
     }
+    game.item_manager = ItemManager.new(test_items)
 
     print("Game loaded successfully!")
 end
 
 function love.update(dt)
     local intent = game.input:read()
+
+    -- Item interactions (pickup, drop, swap)
+    game.item_manager:handle_interact(game.player, intent)
+    game.item_manager:handle_swap(game.player, intent)
 
     -- Update player
     game.player:update(dt, intent)
@@ -64,9 +69,7 @@ function love.update(dt)
     )
 
     -- Update items (thrown projectiles)
-    for _, item in ipairs(game.items) do
-        item:update(dt)
-    end
+    game.item_manager:update(dt)
 
     -- Camera follows player
     game.camera:update(dt, game.player.x, game.player.y)
@@ -76,10 +79,7 @@ function love.draw()
     -- World space (camera-transformed)
     game.camera:apply()
     game.room:draw()
-    -- Draw items
-    for _, item in ipairs(game.items) do
-        item:draw()
-    end
+    game.item_manager:draw()
     game.player:draw()
     game.camera:release()
 
@@ -87,6 +87,16 @@ function love.draw()
     love.graphics.setColor(1, 1, 1, 0.5)
     love.graphics.print("FPS: " .. love.timer.getFPS(), 10, 10)
     love.graphics.print("WASD: Move | Mouse: Aim | Space: Dash", 10, 30)
+    love.graphics.print("E: Pick up / Drop | Tab: Swap item", 10, 50)
+
+    -- Carry info
+    local count = game.player:carry_count()
+    local weight = game.player:total_carried_weight()
+    love.graphics.print(string.format("Carrying: %d/3  Weight: %.0f", count, weight), 10, 70)
+    local active = game.player:get_active_item()
+    if active then
+        love.graphics.print("Active: " .. active.name, 10, 90)
+    end
 end
 
 function love.keypressed(key, scancode, isrepeat)

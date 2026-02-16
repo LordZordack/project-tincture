@@ -1,5 +1,7 @@
 -- entities/player.lua
--- Player entity: colored triangle with WASD movement, mouse-aim, turn delay, and dash.
+-- Player entity: colored triangle with WASD movement, mouse-aim, turn delay, dash, and carry system.
+
+local Item = require("entities.item")
 
 local Player = {}
 Player.__index = Player
@@ -43,6 +45,14 @@ function Player.new(x, y)
     self.size = 20 -- triangle "radius"
     self.color = { 0.2, 0.7, 1.0 } -- light blue
 
+    -- Carry system
+    self.carry_strength = 10 -- max weight per item that can be picked up
+    self.carried = {} -- array of up to 3 carried items (index 1 = active)
+    self.orbit_angle = 0 -- current angle for orbiting items animation
+    self.orbit_speed = 2.0 -- radians/sec for orbit rotation
+    self.orbit_radius = 35 -- distance from player center for orbiting items
+    self.active_item_distance = 25 -- distance forward for active item
+
     return self
 end
 
@@ -83,6 +93,9 @@ function Player:update(dt, input)
 
     -- 3. Movement
     self:_update_movement(dt, input)
+
+    -- 4. Update orbit animation
+    self.orbit_angle = self.orbit_angle + self.orbit_speed * dt
 end
 
 function Player:_update_orientation(dt, input)
@@ -181,14 +194,85 @@ function Player:_update_movement(dt, input)
         dy = dy / len
     end
 
-    local speed = self.base_speed * speed_mult
+    local speed = self.base_speed * speed_mult * self:_weight_speed_factor()
 
     self.x = self.x + dx * speed * dt
     self.y = self.y + dy * speed * dt
 end
 
+--- Get total weight of all carried items.
+function Player:total_carried_weight()
+    local total = 0
+    for _, item in ipairs(self.carried) do
+        total = total + item.weight
+    end
+    return total
+end
+
+--- Speed factor based on carried weight (1.0 = no items, 0.5 = very heavy).
+function Player:_weight_speed_factor()
+    local weight = self:total_carried_weight()
+    if weight <= 0 then return 1.0 end
+    -- Each unit of weight reduces speed by ~3%, capped at 50% reduction
+    return math.max(0.5, 1.0 - weight * 0.03)
+end
+
+--- How many items is the player carrying?
+function Player:carry_count()
+    return #self.carried
+end
+
+--- Pick up an item (adds to carried slots).
+-- @param item Item The item to pick up
+function Player:pick_up(item)
+    if #self.carried >= 3 then return false end
+
+    table.insert(self.carried, item)
+    -- Assign state based on slot
+    self:_update_carry_states()
+    return true
+end
+
+--- Drop the active item (index 1). Returns the dropped item or nil.
+function Player:drop_active()
+    if #self.carried == 0 then return nil end
+    local item = table.remove(self.carried, 1)
+    self:_update_carry_states()
+    return item
+end
+
+--- Swap: cycle carried items so the next one becomes active.
+function Player:swap_active()
+    if #self.carried <= 1 then return end
+    -- Rotate: move first to end
+    local first = table.remove(self.carried, 1)
+    table.insert(self.carried, first)
+    self:_update_carry_states()
+end
+
+--- Update item states to match their carry slot position.
+function Player:_update_carry_states()
+    for i, item in ipairs(self.carried) do
+        if i == 1 then
+            item:set_state(Item.STATES.CARRIED_ACTIVE)
+        elseif i == 2 then
+            item:set_state(Item.STATES.CARRIED_ORBIT1)
+        elseif i == 3 then
+            item:set_state(Item.STATES.CARRIED_ORBIT2)
+        end
+    end
+end
+
+--- Get the active (front) item, or nil.
+function Player:get_active_item()
+    return self.carried[1]
+end
+
 --- Draw the player as a triangle pointing in the facing direction.
 function Player:draw()
+    -- Draw orbiting items first (behind player)
+    self:_draw_carried_items()
+
     love.graphics.push()
     love.graphics.translate(self.x, self.y)
     love.graphics.rotate(self.angle)
@@ -222,6 +306,33 @@ function Player:draw()
     else
         love.graphics.setColor(1, 1, 1, 0.7)
         love.graphics.circle("fill", self.x, self.y - self.size - 8, 3)
+    end
+end
+
+--- Draw carried items: active in front, orbit items around player with brother glow.
+function Player:_draw_carried_items()
+    for i, item in ipairs(self.carried) do
+        if i == 1 then
+            -- Active item: floats in front of the player
+            local ix = self.x + math.cos(self.angle) * self.active_item_distance
+            local iy = self.y + math.sin(self.angle) * self.active_item_distance
+            item:draw_at(ix, iy)
+        else
+            -- Orbiting items: positioned at fixed angles offset from orbit_angle
+            local orbit_offset = (i == 2) and 0 or math.pi -- opposite sides
+            local a = self.orbit_angle + orbit_offset
+            local ix = self.x + math.cos(a) * self.orbit_radius
+            local iy = self.y + math.sin(a) * self.orbit_radius
+
+            -- Brother glow (faint aura around orbiting items)
+            local glow_color = (i == 2)
+                and { 0.6, 0.8, 1.0, 0.15 } -- Enas: cool blue glow
+                or { 1.0, 0.8, 0.6, 0.15 } -- Dyo: warm amber glow
+            love.graphics.setColor(glow_color)
+            love.graphics.circle("fill", ix, iy, item:get_render_size() + 8)
+
+            item:draw_at(ix, iy)
+        end
     end
 end
 
